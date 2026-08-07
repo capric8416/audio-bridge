@@ -1,0 +1,28 @@
+[Unit]
+Description=Share this machine's headset with a Windows VM
+Documentation=https://github.com/capric8416/audio-bridge
+# The sound server is per-login-session, so this has to be a --user unit and
+# has to come up after PulseAudio/PipeWire.
+After=pulseaudio.service pipewire.service
+Wants=pipewire.service
+
+[Service]
+ExecStart=%h/.local/bin/audiobridge-host --config %h/.config/audiobridge/host.toml
+Restart=on-failure
+RestartSec=5
+
+# Log through the journal; the binary writes plain lines to stderr.
+StandardOutput=journal
+StandardError=journal
+
+# Audio wants to be scheduled promptly, but not badly enough to risk starving
+# the machine. Requires a rtkit/limits setup that permits it; harmless if not.
+Nice=-5
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

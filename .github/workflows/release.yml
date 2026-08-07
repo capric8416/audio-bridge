@@ -1,0 +1,122 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: build linux x64
+    runs-on: ubuntu-latest
+    # Built inside Debian 11 rather than on the runner image, and not with
+    # cargo-zigbuild: audiobridge-host links libpulse, and cross-linking a
+    # system shared library against zig's older glibc is fragile. Bullseye's
+    # glibc 2.31 covers Debian 11+, Ubuntu 20.04+ and anything newer.
+    container: debian:bullseye
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential pkg-config libpulse-dev curl ca-certificates git
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --default-toolchain stable \
+                --component rustfmt,clippy --no-modify-path
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Build Linux release
+        run: cargo build --release -p audiobridge-host
+
+      - name: Package Linux artifact
+        shell: bash
+        run: |
+          mkdir -p release
+          tar -czf "release/audiobridge-${{ github.ref_name }}-linux-x64.tar.gz" \
+            -C target/release audiobridge-host \
+            -C "$GITHUB_WORKSPACE/config" host.toml \
+            -C "$GITHUB_WORKSPACE/dist" audiobridge-host.service \
+            -C "$GITHUB_WORKSPACE" README.md
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: release/*
+          if-no-files-found: error
+
+  build-windows:
+    name: build windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Test
+        run: cargo test -p audiobridge-vm
+
+      - name: Build Windows release
+        run: cargo build --release -p audiobridge-vm
+
+      - name: Package Windows artifact
+        shell: pwsh
+        run: |
+          # Stage into a separate directory so the upload glob below picks up
+          # the archive and nothing else.
+          New-Item -ItemType Directory -Force -Path release, staging | Out-Null
+          Copy-Item target\release\audiobridge-vm.exe staging\
+          Copy-Item config\vm.toml staging\
+          Copy-Item README.md staging\
+          Compress-Archive `
+            -Path staging\* `
+            -DestinationPath "release\audiobridge-${{ github.ref_name }}-windows-x64.zip" `
+            -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: release/*
+          if-no-files-found: error
+
+  publish-release:
+    name: publish release
+    needs:
+      - build-linux
+      - build-windows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release/**

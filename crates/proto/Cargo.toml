@@ -1,0 +1,9 @@
+[package]
+name = "audiobridge-proto"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Wire format and jitter buffer shared by the audiobridge host and VM agents"
+
+[dependencies]

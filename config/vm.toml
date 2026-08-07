@@ -1,0 +1,48 @@
+# audiobridge-vm — runs inside the Windows guest.
+#
+# The audio format is not set here. The host side proposes it during the
+# handshake and this side follows, so the two can never disagree.
+
+# Interface and port to listen on. 0.0.0.0 accepts the host over any NIC;
+# narrow it to the guest's virtual NIC address if the VM is also on a real
+# network.
+listen = "0.0.0.0:17322"
+
+# Must match [server].token on the host. Empty disables authentication —
+# only reasonable on a host-only virtual network.
+token = "change-me"
+
+# Drop the session if the host goes quiet for this long. The host re-handshakes
+# on its own, so this only decides how quickly the audio devices are released.
+idle_timeout_ms = 5000
+
+# Audio arriving from the Linux microphone. It is *played* into the render half
+# of a virtual cable; Windows applications then pick the matching capture half
+# as their microphone.
+[mic]
+enabled = true
+# Run `audiobridge-vm --list-devices` and copy a name from the Render column.
+# Leaving this empty sends your voice to the guest's speakers instead of its
+# microphone, which is almost never what you want.
+device = "CABLE Input (VB-Audio Virtual Cable)"
+# Extra latency this side adds to absorb network jitter. 40 ms is comfortable on
+# a virtio link; drop to 20 if you want it tighter and the log stays clean.
+buffer_ms = 40
+
+# Audio Windows is playing, sent back to the Linux headphones.
+[speaker]
+enabled = true
+
+# "loopback" taps a playback device and copies whatever it is playing. With an
+# empty `device` that is the guest's default output, so everything the guest
+# plays comes back with no extra virtual cable to install. This is the setting
+# to start with.
+mode = "loopback"
+device = ""
+
+# "capture" instead reads a real recording device. Use it if you route guest
+# playback into a *second* virtual cable and read that cable's output half —
+# slightly cleaner, and it keeps working while the render endpoint is idle.
+#
+# mode = "capture"
+# device = "CABLE-A Output (VB-Audio Cable A)"
