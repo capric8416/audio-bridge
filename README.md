@@ -10,8 +10,9 @@ your headphones. Two small binaries and a UDP link between them.
  │ headset mic  ──► PA  │ ══ mic packets ══► │ ──► "CABLE Input" (render)  │
  │                      │                    │       ↳ apps record from    │
  │                      │                    │         "CABLE Output"      │
- │ headphones ◄── PA    │ ◄═ spk packets ══  │ ◄── loopback on the guest's │
- │                      │                    │     default playback device │
+ │ headphones ◄── PA    │ ◄═ spk packets ══  │ ◄── loopback on a playback  │
+ │                      │                    │     device that is not that │
+ │                      │                    │     cable (see below)       │
  └──────────────────────┘                    └─────────────────────────────┘
 ```
 
@@ -64,8 +65,30 @@ Install it in the guest and reboot. You get a pair of devices: `CABLE Input`
 your voice into `CABLE Input`; Teams, Discord and friends select `CABLE Output`
 as their microphone.
 
-Nothing extra is needed for the return direction — the default `loopback` mode
-taps the guest's normal playback device.
+### 1b. Give the guest somewhere to play
+
+The return direction taps a playback device with `loopback`, and that device
+must not be the cable from the previous step. If it is — which is what happens
+when the cable is the guest's only playback device, since installing VB-CABLE
+also makes it the default — the bridge loops your own voice straight back to
+your headphones and mixes it into what applications record.
+
+A VM often has no emulated sound card at all, so check with `--list-devices`.
+If the render list contains nothing but `CABLE …`, add one; under libvirt that
+is one line in `virsh edit`, inside `<devices>`:
+
+```xml
+<sound model='ich9'/>
+```
+
+Windows then gains `Speakers (High Definition Audio Device)`. Make it the
+default output so applications play there, and point `[speaker].device` at it.
+Nothing has to come out of it on the Linux side — the loopback tap works even
+when the host discards the QEMU audio backend's output.
+
+The alternative is a second virtual cable (VB-Audio Cable A/B): make
+`CABLE-A Input` the default output and either loopback it or read `CABLE-A
+Output` directly with `mode = "capture"`.
 
 ### 2. Configure both sides
 
@@ -88,12 +111,12 @@ audiobridge-host --config host.toml --check
 
 ### 3. Open the port
 
-The guest listens on UDP 17322 by default. Windows Firewall blocks it until told
+The guest listens on UDP 17420 by default. Windows Firewall blocks it until told
 otherwise:
 
 ```powershell
 New-NetFirewallRule -DisplayName "audiobridge" -Direction Inbound `
-  -Protocol UDP -LocalPort 17322 -Action Allow
+  -Protocol UDP -LocalPort 17420 -Action Allow
 ```
 
 ### 4. Run them

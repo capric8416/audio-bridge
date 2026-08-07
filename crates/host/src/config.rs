@@ -212,7 +212,7 @@ mod tests {
         let cfg = parse(
             r#"
             [server]
-            address = "192.168.122.100:17322"
+            address = "192.168.122.240:17420"
             "#,
         )
         .unwrap();

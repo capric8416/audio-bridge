@@ -7,7 +7,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VmConfig {
-    /// `ip:port` to listen on. `0.0.0.0:17322` accepts from any interface.
+    /// `ip:port` to listen on. `0.0.0.0:17420` accepts from any interface.
     pub listen: SocketAddr,
     #[serde(default)]
     pub token: String,
@@ -163,7 +163,7 @@ mod tests {
     fn minimal_config_gets_sane_defaults() {
         let cfg = parse(
             r#"
-            listen = "0.0.0.0:17322"
+            listen = "0.0.0.0:17420"
             [mic]
             device = "CABLE Input (VB-Audio Virtual Cable)"
             "#,
@@ -181,7 +181,7 @@ mod tests {
     fn capture_mode_parses_from_a_bare_word() {
         let cfg = parse(
             r#"
-            listen = "0.0.0.0:17322"
+            listen = "0.0.0.0:17420"
             [mic]
             device = "CABLE Input"
             [speaker]

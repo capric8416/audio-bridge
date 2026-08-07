@@ -1,11 +1,10 @@
 # audiobridge-host — runs on the Linux machine that has the headset plugged in.
 
 [server]
-# Where audiobridge-vm listens. For a KVM guest on the default libvirt network
-# this is the guest's 192.168.122.x address.
-address = "192.168.122.100:17322"
+# Where audiobridge-vm listens, i.e. the Windows guest on the libvirt network.
+address = "192.168.122.240:17420"
 # Must match the VM side. Empty disables authentication.
-token = "change-me"
+token = "5489849966250daab413fca7bb1faea1d4e21f5d0352434afdf5699c31d4a0de539d3e55ab650d7d3d0f5b4cdedd55911403c74f24ea53d19b8cb2c57954a3aa"
 # Resend Hello this often until the VM answers.
 handshake_timeout_ms = 1000
 # Re-handshake after this long without a packet from the VM.
@@ -14,9 +13,9 @@ idle_timeout_ms = 5000
 # Real microphone -> the VM's virtual microphone.
 [mic]
 enabled = true
-# PulseAudio/PipeWire source name; run `audiobridge-host --list-devices`.
-# Empty follows the system default source.
-device = ""
+# The USB headset's mono input. Named explicitly rather than left empty so a
+# newly plugged-in device cannot silently steal the default.
+device = "alsa_input.usb-C-Media_Electronics_Inc._Cmedia_Audio-00.mono-fallback"
 rate = 48000
 channels = 1
 frame_ms = 10
@@ -24,12 +23,13 @@ frame_ms = 10
 # The VM's playback -> real headphones.
 [speaker]
 enabled = true
-# Sink name; empty follows the system default sink.
-device = ""
+# The USB headset's analog output. There are two Cmedia analog-stereo sinks;
+# this is the one PipeWire currently defaults to.
+device = "alsa_output.usb-C-Media_Electronics_Inc._Cmedia_Audio-00.analog-stereo"
 rate = 48000
 channels = 2
 # 48 kHz stereo at 10 ms is 1920 bytes of payload, which needs one IP fragment
-# on a 1500-byte path. Over a virtio link that is free; over Wi-Fi use 5.
+# on a 1500-byte path. Over the virtio link to the guest that is free.
 frame_ms = 10
 # Latency this side adds to absorb jitter and clock drift. Raise it if the log
 # reports underruns.
