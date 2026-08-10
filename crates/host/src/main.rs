@@ -12,7 +12,7 @@ mod pulse;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use audiobridge_proto::JitterBuffer;
 use clap::Parser;
 
@@ -30,9 +30,10 @@ const MIC_QUEUE: usize = 8;
     about = "Share this machine's headset with a Windows box over the network"
 )]
 struct Cli {
-    /// Path to the TOML configuration file.
-    #[arg(short, long, default_value = "host.toml")]
-    config: PathBuf,
+    /// Path to the TOML configuration file. By default, look in the current
+    /// working directory first, then beside the executable.
+    #[arg(short, long)]
+    config: Option<PathBuf>,
     /// Validate the configuration and exit.
     #[arg(long)]
     check: bool,
@@ -53,9 +54,10 @@ async fn main() -> Result<()> {
         return list_devices();
     }
 
-    let cfg = Arc::new(HostConfig::load(&cli.config)?);
+    let config_path = resolve_config_path(cli.config)?;
+    let cfg = Arc::new(HostConfig::load(&config_path)?);
     if cli.check {
-        print_summary(&cfg, &cli.config);
+        print_summary(&cfg, &config_path);
         return Ok(());
     }
 
@@ -103,6 +105,33 @@ async fn main() -> Result<()> {
         t.stop();
     }
     result
+}
+
+fn resolve_config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    if let Some(path) = explicit {
+        return Ok(path);
+    }
+
+    let cwd = std::env::current_dir().context("finding the current working directory")?;
+    let cwd_config = cwd.join("host.toml");
+    if cwd_config.is_file() {
+        return Ok(cwd_config);
+    }
+
+    let executable = std::env::current_exe().context("finding the executable path")?;
+    let executable_dir = executable
+        .parent()
+        .context("the executable path has no parent directory")?;
+    let executable_config = executable_dir.join("host.toml");
+    if executable_config.is_file() {
+        return Ok(executable_config);
+    }
+
+    bail!(
+        "host.toml was not found in the current working directory ({}) or beside the executable ({}); use --config <path>",
+        cwd.display(),
+        executable_dir.display()
+    )
 }
 
 fn print_summary(cfg: &HostConfig, path: &std::path::Path) {

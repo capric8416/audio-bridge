@@ -128,6 +128,10 @@ gets one, so the order only affects how long the first connection takes.
 audiobridge-vm.exe --config vm.toml
 ```
 
+Without `--config`, each agent looks for its config (`vm.toml` or `host.toml`)
+in the current working directory first and then in the directory containing
+the executable.
+
 ```sh
 audiobridge-host --config host.toml
 ```
